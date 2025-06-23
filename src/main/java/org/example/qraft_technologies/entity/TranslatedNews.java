@@ -22,6 +22,6 @@ public class TranslatedNews {
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
-    @Column(name="published_at")
+    @Column(name = "published_at")
     private LocalDateTime publishedAt;
 }

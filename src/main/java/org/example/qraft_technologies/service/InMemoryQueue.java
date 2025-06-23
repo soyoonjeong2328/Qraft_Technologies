@@ -6,7 +6,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 @Component
-public class InMemoryQueue implements NewsQueue{
+public class InMemoryQueue implements NewsQueue {
     private final BlockingQueue<String> queue = new LinkedBlockingQueue<>();
 
     @Override
