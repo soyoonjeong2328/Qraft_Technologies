@@ -1,0 +1,12 @@
+version: '3.1'
+
+services:
+  db:
+    image: postgres:15
+    container_name: qraft-postgres
+    environment:
+      POSTGRES_DB: qraft
+      POSTGRES_USER: qraftuser
+      POSTGRES_PASSWORD: qraftpass
+    ports:
+      - "5432:5432"
