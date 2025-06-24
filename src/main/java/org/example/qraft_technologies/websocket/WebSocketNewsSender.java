@@ -53,8 +53,13 @@ public class WebSocketNewsSender extends TextWebSocketHandler {
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String token = (String) session.getAttributes().get("token");
 
-        WebSocketSession previous = sessions.put(token, session);
+        if (token == null) {
+            log.warn("[WebSocket] 세션에 토큰 없음 → 세션 ID={}", session.getId());
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
 
+        WebSocketSession previous = sessions.put(token, session);
         if (previous != null && previous != session) {
             try {
                 previous.close(CloseStatus.NORMAL);

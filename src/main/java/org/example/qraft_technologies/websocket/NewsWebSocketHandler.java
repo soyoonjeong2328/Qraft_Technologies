@@ -1,5 +1,7 @@
 package org.example.qraft_technologies.websocket;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.qraft_technologies.exception.InvalidTokenException;
 import org.springframework.stereotype.Component;
@@ -11,13 +13,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class NewsWebSocketHandler extends TextWebSocketHandler {
 
+    @Getter
     private final Set<WebSocketSession> sessions = ConcurrentHashMap.newKeySet();
-
-    public Set<WebSocketSession> getSessions() {
-        return sessions;
-    }
+    private final ActiveClientManager manager;
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
@@ -25,11 +26,16 @@ public class NewsWebSocketHandler extends TextWebSocketHandler {
             String token = extractToken(session);
             session.getAttributes().put("token", token);
 
+            if(!manager.register(token, session)) {
+                log.warn("중복 연결 시도 차단: token={}, sessionId={}", token, session.getId());
+                session.close(CloseStatus.POLICY_VIOLATION);
+                return;
+            }
+
             sessions.add(session);
             log.info("WebSocket 연결 완료: token={}, sessionId={}", token, session.getId());
         } catch (InvalidTokenException e) {
             log.warn("WebSocket 연결 실패 - 세션 ID: {}, 이유: {}", session.getId(), e.getMessage());
-
             session.close(CloseStatus.POLICY_VIOLATION);
         }
     }
@@ -38,7 +44,11 @@ public class NewsWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         sessions.remove(session);
-        String token = extractToken(session);
+        String token = (String) session.getAttributes().get("token");
+
+        if(token != null) {
+            manager.unregister(token);
+        }
         log.info("WebSocket 연결 종료: token={}, sessions={}, status={}", token, session.getId(), status);
     }
 
@@ -48,19 +58,13 @@ public class NewsWebSocketHandler extends TextWebSocketHandler {
     }
 
     private String extractToken(WebSocketSession session) {
-        if (session.getUri() == null || session.getUri().getQuery() == null) {
-            throw new InvalidTokenException("쿼리 파라미터가 존재하지 않아 토큰을 추출할 수 없습니다.");
+        String header = session.getHandshakeHeaders().getFirst("Authorization");
+
+        if(header == null || !header.startsWith("Bearer ")) {
+            throw new InvalidTokenException("Authorization 헤더가 없거나 형식이 잘못되었습니다.");
         }
 
-        String query = session.getUri().getQuery();
-        for (String param : query.split("&")) {
-            String[] keyValue = param.split("=");
-            if (keyValue.length == 2 && keyValue[0].equals("token")) {
-                return keyValue[1];
-            }
-        }
-
-        throw new InvalidTokenException("token 파라미터가 존재하지 않습니다.");
+        return header.substring(7);
     }
 
 
