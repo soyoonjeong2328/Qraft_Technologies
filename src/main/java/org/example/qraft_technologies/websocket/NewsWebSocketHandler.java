@@ -31,4 +31,9 @@ public class NewsWebSocketHandler extends TextWebSocketHandler {
     public Set<WebSocketSession> getSessions() {
         return sessions;
     }
+
+    @Override
+    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+        logger.error("웹소켓 연결 중 오류 발생 - 세션 ID: {}, 에러: {}", session.getId(), exception.getMessage());
+    }
 }

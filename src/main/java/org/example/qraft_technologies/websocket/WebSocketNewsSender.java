@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.example.qraft_technologies.dto.NewsDto;
 import org.example.qraft_technologies.entity.TranslatedNews;
+import org.example.qraft_technologies.exception.WebSocketSendException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
@@ -30,8 +33,8 @@ public class WebSocketNewsSender extends TextWebSocketHandler {
                     logger.info("전송 완료 → 세션 ID: {}", session.getId());
                 }
             }
-        } catch (Exception e) {
-            logger.error("[웹소켓 전송 실패] - 뉴스 ID: {}", translatedNews.getId(), e);
+        } catch (IOException e) {
+            throw new WebSocketSendException("웹소켓 메시지 전송 실패 : {}", e);
         }
     }
 }

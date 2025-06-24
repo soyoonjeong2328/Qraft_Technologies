@@ -3,6 +3,7 @@ package org.example.qraft_technologies.service;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.example.qraft_technologies.entity.TranslatedNews;
+import org.example.qraft_technologies.exception.NewsNotFoundException;
 import org.example.qraft_technologies.repository.TranslatedNewsRepository;
 import org.example.qraft_technologies.websocket.WebSocketNewsSender;
 import org.slf4j.Logger;
@@ -28,12 +29,15 @@ public class NewsDeliveryService {
                     logger.info("뉴스 ID 수신:{}", newsId);
 
                     TranslatedNews translatedNews = repository.findById(newsId)
-                            .orElseThrow(() -> new RuntimeException("뉴스 ID 찾을 수 없음 : " + newsId));
+                            .orElseThrow(() -> new NewsNotFoundException(newsId));
                     logger.info("뉴스 DB 조회 성공 : {}", translatedNews.getTitle());
 
                     sender.broadcast(translatedNews);
+                    logger.info("뉴스 전송 완료: {}", newsId);
+                } catch (NewsNotFoundException e) {
+                    logger.warn("뉴스 조회 실패: {}", e.getMessage());
                 } catch (Exception e) {
-                    logger.error("[ERROR] 뉴스 전송 중 예외 발생 : {}", e.getMessage());
+                    logger.error("뉴스 처리 중 알 수 없는 오류 발생 : {}", e.getMessage());
                 }
             }
         }).start();
