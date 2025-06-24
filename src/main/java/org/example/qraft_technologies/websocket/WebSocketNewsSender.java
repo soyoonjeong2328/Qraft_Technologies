@@ -2,11 +2,10 @@ package org.example.qraft_technologies.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.example.qraft_technologies.dto.NewsDto;
 import org.example.qraft_technologies.entity.TranslatedNews;
 import org.example.qraft_technologies.exception.WebSocketSendException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -19,66 +18,64 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class WebSocketNewsSender extends TextWebSocketHandler {
 
+    private final NewsWebSocketHandler handler;
     private final ObjectMapper objectMapper;
-    private static final Logger logger = LoggerFactory.getLogger(WebSocketNewsSender.class);
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
 
     public void broadcast(TranslatedNews translatedNews) {
         try {
             String json = objectMapper.writeValueAsString(NewsDto.from(translatedNews));
-            logger.info("[WebSocket] 뉴스 전송 시작 : {}", translatedNews.getId());
+            log.info("[WebSocket] 뉴스 전송 시작 : {}", translatedNews.getId());
 
-            for (WebSocketSession session : sessions.values()) {
-                if (session.isOpen()) {
+            for (WebSocketSession session : handler.getSessions()) {
+                if (!session.isOpen()) {
+                    log.warn("닫힌 세션 → 전송 생략: 세션 ID={}", session.getId());
+                    continue;
+                }
+
+                try {
                     session.sendMessage(new TextMessage(json));
-                    logger.info("[WebSocket] 전송 완료 → 세션 ID: {}", session.getId());
+                    log.info("전송 완료 → 세션 ID={}", session.getId());
+                } catch (IOException e) {
+                    log.error("세션 전송 중 오류 발생 → 세션 ID={}, 뉴스 ID={}", session.getId(), translatedNews.getId(), e);
                 }
             }
+
         } catch (IOException e) {
-            throw new WebSocketSendException("웹소켓 메시지 전송 실패 : {}", e);
+            throw new WebSocketSendException("웹소켓 메시지 전송 실패 : {}" + e.getMessage(), e);
         }
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-        String token = extractToken(session);
+        String token = (String) session.getAttributes().get("token");
+
         WebSocketSession previous = sessions.put(token, session);
 
         if (previous != null && previous != session) {
             try {
                 previous.close(CloseStatus.NORMAL);
-                logger.info("[WebSocket] 중복 연결로 기존 세션 종료 : token={}", token);
+                log.info("[WebSocket] 중복 연결로 기존 세션 종료: token={}", token);
             } catch (IOException e) {
-                logger.error("[WebSocket] 기존 세션 종료 중 오류 발생: token={}", token);
+                log.warn("[WebSocket] 기존 세션 종료 중 오류 발생: token={}", token, e);
             }
         }
-        logger.info("[WebSocket] 연결 완료: token={}, session={}", token, session.getId());
+
+        log.info("[WebSocket] 새로운 연결 완료: token={}, sessionId={}", token, session.getId());
     }
+
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
-        String token = extractToken(session);
+        String token = (String) session.getAttributes().get("token");
 
         if (token != null && session.equals(sessions.get(token))) {
             sessions.remove(token);
-            logger.info("[WebSocket] 연결 종료: token={}, status={}", token, status);
+            log.info("[WebSocket] 연결 종료: token={}, sessionId={}, status={}", token, session.getId(), status);
         }
     }
 
-    private String extractToken(WebSocketSession session) {
-        if (session.getUri() == null || session.getUri().getQuery() == null) {
-            return "anonymous";
-        }
-
-        String query = session.getUri().getQuery();
-        for (String str : query.split("&")) {
-            String[] split = str.split("=");
-            if (split.length == 2 && split[0].equals("token")) {
-                return split[1];
-            }
-        }
-        return "anonymous";
-    }
 }
