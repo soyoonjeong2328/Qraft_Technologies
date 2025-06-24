@@ -9,13 +9,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 @Component
 @RequiredArgsConstructor
-public class WebSocketNewsSender {
+public class WebSocketNewsSender extends TextWebSocketHandler {
 
     private final NewsWebSocketHandler handler;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
     private static final Logger logger = LoggerFactory.getLogger(WebSocketNewsSender.class);
 
     public void broadcast(TranslatedNews translatedNews) {
